@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      footer p{
+         margin:2px;
+      }
+
+
+      .blackColor{
+        color: black;
+        font-weight: bold;
+      }
+
+      .WhiteColor{
+        color: white;
+        font-weight: bold;
+      }
+
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+
+      }
+      .navigationElem img{
+        float: left;
+        display: block;
+        padding: 0px 5px;
+        font-size: 15pt;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #00000000;
+      }
+
+      .navigationElem img:hover{
+        background-color: #0141A6;
+      }
+
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+
+
+      footer{
+        background-color:#3171C6;
+        color:white;
+
+        position: fixed;
+
+        bottom: 0;
+        width: 100%
+
+      }
+
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+      #gameBoardCanvas{
+        background-color:#000000;
+        display: block;
+        margin-top: 15px;
+        margin-left: auto;
+        margin-right: auto;
+
+      }
+
+      #settings{
+        background-color: #3171C6;
+        position: absolute;
+        top: 50px;
+        right: 0;
+        width: 300px;
+        overflow: hidden;
+        transition: all .5s ease-in-out;
+        height: 0px;
+
+      }
+
+      #settings *{
+        line-height: 1.5;
+        display: inline-block;
+        vertical-align: middle;
+        display:block;
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    </style>
+
+    <script type="text/javascript">
+      //console.log("Start of Script");
+      var gameBoardCanvas;
+      var gameBoard;
+      var title;
+      var infoArea;
+      var numberOfTiles = 8;
+      var offline = true;
+      var ai = false;
+      var gameEnded = false;
+      var login = undefined;
+      var avatarPath = "avatars\\default.png";
+      var httpRequest = new XMLHttpRequest();
+      var loading = true; // if waiting for response from server
+      var turnCount = 0; // for keeping track of the number of turns to avoid overwriting the SQL table with a prev turn
+
+      var gameColor = "#55A56E";
+      var whiteColor = "#F0F0F0";
+      var blackColor = "#303030";
+      var boderColor = "#73560D";
+      var tileMatrix = [...new Array(numberOfTiles)].map(()=> new Array(numberOfTiles).fill('e')); // 'e' empty, 'w' white, 'b' black // format> [col][row]  [x][y]
+        //col is labeled as letters but are not and numbers for rows are 1,2,3... and matrix is 0,1,2...
+        tileMatrix[(numberOfTiles/2)-1][(numberOfTiles/2)-1] = 'w';
+        tileMatrix[(numberOfTiles/2)][(numberOfTiles/2)]     = 'w';
+
+        tileMatrix[(numberOfTiles/2)][(numberOfTiles/2)-1] = 'b';
+        tileMatrix[(numberOfTiles/2)-1][(numberOfTiles/2)] = 'b';
+
+      var possibleMoves = new Array();
+      var piecesToFlip = new Array();
+      var mouseOverPiece = null; // not over a peice
+      var playerToMove = 'b';
+      var inAnimation = false; // don't let the player interact while flipping pieces
+      var lastPlayerCouldNotMove = false;
+      var timeOfBeginning = new Date() // time of begining of match
+      var timeOfLastUpdate = new Date() // for checking if the game should flip the next piece
+      var timeOfGameEnd = null; // for if game is over
+      var milPerUpdate = 40; // update board every __ milliseconds 33ms~30fps
+
+      var intervalID; // id of interval event
+      var width; // canvas width
+      var height;
+      var tileSize; // size of each tile in px
+      var borderSize; // size of border in px
+
+      function getQueryVariable(variable){
+       var query = window.location.search.substring(1);
+       var vars = query.split("&");
+       for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+               if(pair[0] == variable){return pair[1];}
+             }
+       return(false);
+      }
+
+
+      function canvasLoad(){
+        checkLogin(); // check for login first to allow time for callback;
+        gameBoardCanvas = document.getElementById('gameBoardCanvas');
+        gameBoard = gameBoardCanvas.getContext("2d");
+        title = document.getElementById(gameNameTitle);
+        infoArea = document.getElementById('gameInfo');
+
+        //set up setting menu input boxes
+        var colorPicker = document.getElementById("backgroundColorInput");
+        colorPicker.value = gameColor;
+        colorPicker.addEventListener("blur", function() {
+            document.getElementById("backgroundColorInput").value = gameColor;
+        });
+
+        colorPicker = document.getElementById("whiteColorInput");
+        colorPicker.value = whiteColor;
+        colorPicker.addEventListener("blur", function() {
+            document.getElementById("whiteColorInput").value = whiteColor;
+        });
+
+        colorPicker = document.getElementById("blackColorInput");
+        colorPicker.value = blackColor;
+        colorPicker.addEventListener("blur", function() {
+            document.getElementById("blackColorInput").value = blackColor;
+        });
+
+        width = gameBoardCanvas.width;
+        height = gameBoardCanvas.height;
+
+        // set up url variables
+        
+        if(getQueryVariable("boardSize") !== false){
+          var temp = Number(getQueryVariable("boardSize"))
+          if(temp === 4 || temp === 8 ||temp === 6){ // allowed board sizes
+            numberOfTiles = temp;
+            tileMatrix = [...new Array(numberOfTiles)].map(()=> new Array(numberOfTiles).fill('e'));
+            tileMatrix[(numberOfTiles/2)-1][(numberOfTiles/2)-1] = 'w';
+            tileMatrix[(numberOfTiles/2)][(numberOfTiles/2)]     = 'w';
+
+            tileMatrix[(numberOfTiles/2)][(numberOfTiles/2)-1] = 'b';
+            tileMatrix[(numberOfTiles/2)-1][(numberOfTiles/2)] = 'b';
+          }
+        }
+
+
+        if(getQueryVariable("ai") === "true"){
+          ai = true;
+          document.getElementsByName("AI")[0].checked = true;
+        }
+        
+        if(getQueryVariable("id") === false ){ // not a saved game
+          offline = true;
+          document.getElementById("gameNameTitle").innerHTML = "Offline Game";
+          updateScore();
+        }else{
+          document.getElementById("AIToggle").style.display = "none";
+          offline = false;
+          fetchOnlineGame(getQueryVariable("id"));
+        }
+        
+        if(width !== height){ // if not even square
+          tileSize = Math.max(width, height)/(numberOfTiles+1);
+        }else{
+          tileSize = width/(numberOfTiles+1); // number of tiles + size for border
+        }
+
+        borderSize = tileSize/2; // border is half size of tile
+
+        
+        drawBackground();
+        findPossibleMoves(playerToMove);
+        drawPieces();
+        gameBoardCanvas.addEventListener('click', onClick);
+        gameBoardCanvas.addEventListener('mousemove', onHover);
+        intervalID = setInterval(animateDraw, milPerUpdate);
+      }
+      
+      function fetchOnlineGame(gameID){
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        loading = true;
+        httpRequest.onreadystatechange = returnOnlineGameSetup; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','fetchGame.php',false); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        httpRequest.send("array=" + "{\"id\":\""+ gameID + "\"}");
+      }
+      
+      function returnOnlineGameSetup(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+            if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                 
+                 jsonReturn = JSON.parse(httpRequest.responseText);
+                 if(jsonReturn["error"] !== undefined){
+                   offline = true;
+                   document.getElementById("gameNameTitle").innerHTML = jsonReturn["error"] + "<br> Starting Offline Game";
+                   document.getElementById("gameNameTitle").style = "color:red;";
+                   document.getElementById("gameNameTitle").role = "alert";
+                   
+                 }else if(jsonReturn["gameBoard"] !== undefined){
+                   document.getElementById("gameNameTitle").innerHTML = "Online Game";
+                   
+                   // setup board
+                   tileMatrixString = jsonReturn["gameBoard"];
+                   tileMatrix = JSON.parse("{ \"array\":" + tileMatrixString + "}")["array"];
+                   numberOfTiles = tileMatrix.length;
+                   
+                   ai = jsonReturn["ai"];
+                  
+                  // get current turn count and which player's turn
+                  turnCount = Number(jsonReturn["turn"]);
+                   
+                   playerToMove = "b";
+                   if(turnCount % 2 == 1){ // if it is odd it is whites turn
+                     playerToMove = "w";
+                   }
+                   // update page turn tracker
+                   var turnDiv = document.getElementById('turnCounter');
+                   if(playerToMove == 'w'){
+                     turnDiv.innerHTML = "Turn: <span class='whiteColor' style='color:" + whiteColor+ ";'>White</span>";
+                   }else{
+                     turnDiv.innerHTML = "Turn: <span class='blackColor' style='color:" + blackColor+ ";'>Black</span>";
+                   }
+                   
+                   //update page's score
+                   updateScore(); 
+                   
+                   if(jsonReturn["complete"] === true || jsonReturn["complete"] === "true"){
+                     gameEnded = true;
+                   }
+                   
+                   // set and update date
+                   var currTime = new Date();
+                   var durString = jsonReturn["duration"];
+                   var durStringArray = durString.split(":")
+                   var secs = Number(durStringArray[2]);
+                   var mins = Number(durStringArray[1]);
+                   var hours = Number(durStringArray[0]);
+                   
+                   timeOfBeginning = new Date(currTime - ((secs * 1000) + (mins * 60000) + (hours * 3.6e+6)));
+                   
+                   loading = false;
+                   
+                 }else{
+                   offline = true;
+                   document.getElementById("gameNameTitle").innerHTML = "Error communicating to server <br> Starting Offline Game";
+                   document.getElementById("gameNameTitle").style = "color:red;";
+                 }
+                 
+                 
+              }
+      	  } else {
+              alert('There was a problem when requesting login.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception in : ' + e.description + httpRequest.responseText);
+        }
+      }
+
+      function changeTurn(){
+        
+        var turnDiv = document.getElementById('turnCounter');
+        turnCount++;
+        if(playerToMove == 'b'){
+          playerToMove = 'w';
+          turnDiv.innerHTML = "Turn: <span class='whiteColor' style='color:" + whiteColor+ ";'>White</span>";
+        }else{
+          playerToMove = 'b';
+          turnDiv.innerHTML = "Turn: <span class='blackColor' style='color:" + blackColor+ ";'>Black</span>";
+        }
+
+      }
+      
+      function updateMoveWithServer(){
+        var blackNum = 0;
+        var whiteNum = 0;
+        // get score
+        for(let x=0; x < numberOfTiles; x++){
+          for(let y=0; y < numberOfTiles; y++){
+            if(tileMatrix[x][y] == 'b'){
+              blackNum++;
+            }else if(tileMatrix[x][y] == 'w'){
+              whiteNum++;
+            }
+          }
+        }
+        //get current duration of game and format in SQL time
+        var currTime = new Date()
+        if(!gameEnded){
+        var outputTime = currTime - timeOfBeginning;
+        timer.innerHTML = msToTime(outputTime);
+        }else{
+          var outputTime = timeOfGameEnd - timeOfBeginning;
+          timer.innerHTML = msToTime(outputTime);
+        }
+        
+        var durString = msToTime(outputTime);
+        
+        if(durString.length == 5){// 00: + 00:01
+          durString = "00:" + durString;
+        }else if(durString.length == 7){//0 + 1:00:00
+          durString = "0" + durString;
+        }
+        
+        var gameBoardString = JSON.stringify(tileMatrix);
+        
+        var jsonString = "{" + "\"gameBoard\":"+ "\"" + gameBoardString.replace(new RegExp("\"", 'g'), "\\\"") + "\"" + ",\"id\":" + "\"" + getQueryVariable("id") + "\"" + ",\"duration\":" + "\"" + durString + "\"" + ",\"turn\":"+ turnCount + ",\"whiteScore\":"+ whiteNum + ",\"blackScore\":"+ blackNum + ",\"complete\":" + "\"" + gameEnded + "\"" + "}";
+                
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        httpRequest.onreadystatechange = updateReturn; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','updateGame.php'); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        httpRequest.send("array=" + jsonString);
+      }
+      
+      function updateReturn(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+            if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                  
+                
+                if(jsonReturn["error"] !== undefined){
+                  document.getElementById("errorMessageText").innerHTML = jsonReturn["error"];
+                }
+                 
+                 
+              }
+      	  } else {
+              alert('There was a problem when requesting login.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception: ' + e.description);
+        }
+      }
+
+      function drawBackground(){
+        gameBoard.beginPath();
+        gameBoard.shadowColor = "transparent"; // no shadow
+        gameBoard.fillStyle = gameColor; // set background color
+        gameBoard.fillRect(0,0,width,height); // draw background color
+
+        gameBoard.fillStyle = "black";
+
+        for(let i=1; i < numberOfTiles; i++){ // column a,b,c
+          gameBoard.moveTo(borderSize+(tileSize*i),0);
+          gameBoard.lineTo(borderSize+(tileSize*i),height);
+          gameBoard.closePath();
+          gameBoard.stroke();
+        }
+
+        for(let i=1; i < numberOfTiles; i++){ // row 1,2,3
+          gameBoard.moveTo(0,borderSize+(tileSize*i));
+          gameBoard.lineTo(width,borderSize+(tileSize*i));
+          gameBoard.closePath();
+          gameBoard.stroke();
+
+        }
+
+        gameBoard.fillStyle = boderColor;
+        gameBoard.fillRect(0, 0, borderSize, height); //(x,y,width,height) 0,0 is top left
+        gameBoard.fillRect(0, 0, width, borderSize);
+        gameBoard.fillRect(width-borderSize, 0, borderSize, height);
+        gameBoard.fillRect(0, height-borderSize, width, borderSize);
+
+        gameBoard.font = borderSize+"px Arial";
+        gameBoard.fillStyle = "white"
+
+        for(let i=1; i <= numberOfTiles; i++){ // row 1,2,3 numbers
+          gameBoard.fillText(String(i),tileSize/8,tileSize*i + tileSize/4); // fractions are for centering text for coords
+          gameBoard.fillText(String(i),tileSize*numberOfTiles + tileSize*(5/8),tileSize*i + tileSize/4);
+        }
+
+        for(let i=1; i <= numberOfTiles; i++){ // column a,b,c letters
+          gameBoard.fillText(String.fromCharCode(96 + i),tileSize*i - tileSize/8, tileSize*(3/8)); // fractions are for centering text for coords
+          gameBoard.fillText(String.fromCharCode(96 + i),tileSize*i - tileSize/8, tileSize*numberOfTiles + tileSize*(7/8));
+        }
+      }
+
+      function drawPieces(){
+        //'e' empty, 'w' white, 'b' black
+
+        //set up shadow for pieces
+
+        gameBoard.shadowColor = "#101010";
+        gameBoard.shadowBlur = 5;
+        gameBoard.shadowOffsetX = 3;
+        gameBoard.shadowOffsetY = 3;
+
+        for(let x=0; x < numberOfTiles; x++){
+          for(let y=0; y < numberOfTiles; y++){
+            if(tileMatrix[x][y] == 'b'){ // draw black
+              gameBoard.fillStyle = blackColor;
+              gameBoard.beginPath();
+              gameBoard.arc(tileSize*(x+1), tileSize*(y+1), tileSize/2 - 4, 0, 2 * Math.PI);
+              gameBoard.closePath();
+              gameBoard.fill();
+
+            }else if(tileMatrix[x][y] == 'w'){// draw white
+              gameBoard.fillStyle = whiteColor;
+              gameBoard.beginPath();
+              gameBoard.arc(tileSize*(x+1), tileSize*(y+1), tileSize/2 - 4, 0, 2 * Math.PI);
+              gameBoard.closePath();
+              gameBoard.fill();
+
+            }
+          }
+        }
+        drawPossibleMoves();
+      }
+
+      function findPossibleMoves(color){
+        var enemyColor = (color == 'b') ? 'w':'b';
+
+        possibleMoves = new Array();
+
+        for(let x=0; x < numberOfTiles; x++){
+          for(let y=0; y < numberOfTiles; y++){
+            if(tileMatrix[x][y] == color){ //if players piece
+              var tempX = x;
+              var tempY = y-1; // start one tile up
+              //up (up is negitive)
+              while(tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+                tempY--;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x-1;
+              tempY = y;
+              //left (right is negitive)
+              while(tempX > 0 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX--;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x;
+              tempY = y+1;
+              //down (down is positive)
+              while(tempY < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+                tempY++;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x+1;
+              tempY = y;
+              //right (right is positive)
+              while(tempX < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX++;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x+1;
+              tempY = y-1;
+              //upright (right is positive) (up is negitive)
+              while(tempX < numberOfTiles-1 && tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX++;
+                tempY--;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x-1;
+              tempY = y-1;
+              //upleft (left is neg) (up is negitive)
+              while(tempX > 0 && tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX--;
+                tempY--;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x-1;
+              tempY = y+1;
+              //downleft (left is neg) (down is pos)
+              while(tempY < numberOfTiles-1 && tempX > 0 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX--;
+                tempY++;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+              tempX = x+1;
+              tempY = y+1;
+              //downright (right is positive) (down is Pos)
+              while(tempX < numberOfTiles-1 && tempY < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+                tempX++;
+                tempY++;
+                if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+                  possibleMoves.push([tempX,tempY]);
+                  break;
+                }
+              }
+            }
+          }
+        }
+        // Remove Duplicates
+        for(var i=0; i < possibleMoves.length; i++){
+          for(var j=0; j < possibleMoves.length; j++){
+            if(i===j) continue; // if the same element ignore them
+            if(i < possibleMoves.length && j < possibleMoves.length && possibleMoves[i][0] === possibleMoves[j][0] && possibleMoves[i][1] === possibleMoves[j][1]){ // recheckin for bounding conditions becuase of removel of elements can cause errors
+              possibleMoves.splice(j,1);
+            }
+          }
+        }
+        // if no possible moves move to next players
+        if(possibleMoves.length == 0){
+          changeTurn();
+          if(lastPlayerCouldNotMove){// if neither player can move. End game;
+            endGame();
+          }else{
+            lastPlayerCouldNotMove = true;
+            findPossibleMoves(playerToMove);
+          }
+        }else{
+          lastPlayerCouldNotMove = false;
+        }
+      }
+
+      function drawPossibleMoves(){
+        gameBoard.shadowColor = "transparent";
+
+        var pieceColor = whiteColor + "7F"; //#F0F0F0 at .5 alpha
+        if(playerToMove == 'b'){ // if black change color from white to black
+          pieceColor = blackColor + "7F"; //#303030 at .5 alpha
+        }
+
+        for(let i=0; i < possibleMoves.length; i++){
+          let x = possibleMoves[i][0];
+          let y = possibleMoves[i][1];
+
+          gameBoard.fillStyle = pieceColor;
+          if(mouseOverPiece != null && possibleMoves[i][0] === mouseOverPiece[0] && possibleMoves[i][1] === mouseOverPiece[1]){
+            gameBoard.fillStyle = "rgba(105,200,220,0.5)";//transparent blue
+          }
+          gameBoard.beginPath();
+          gameBoard.arc(tileSize*(x+1), tileSize*(y+1), tileSize/2 - 4, 0, 2 * Math.PI);
+          gameBoard.closePath();
+          gameBoard.fill();
+        }
+      }
+
+      function placePiece(x,y){
+        if(inAnimation) return -2; // if in animation do not work and return -2
+        var enemyColor = (playerToMove == 'b') ? 'w':'b';
+        let possibleMove = false;
+
+        for(var i=0; i < possibleMoves.length; i++){ //does x,y exist in possibleMoves
+          if(possibleMoves[i][0] == x && possibleMoves[i][1] == y){
+            possibleMove = true;
+            break;
+          }
+        }
+        var toAddToFlip = new Array();
+        try{
+        if(possibleMove){ // if not a flippable piece then return -1
+          tileMatrix[x][y] = playerToMove;//place piece
+          // mark all peices to be flipped
+          var tempX = x;
+          var tempY = y-1; // start one tile up
+        //up (up is negitive)
+          while(tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempY--;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x-1;
+          tempY = y;
+          //left (left is neg)
+          while(tempX > 0 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX--;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x;
+          tempY = y+1;
+          //down (down is positive)
+          while(tempY < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempY++;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x+1;
+          tempY = y;
+          //right (right is pos)
+          while(tempX < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX++;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x+1;
+          tempY = y-1;
+          //upright (right is positive)(up is neg)
+          while(tempX < numberOfTiles-1 && tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX++;
+            tempY--;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x-1;
+          tempY = y-1;
+          //upleft (left is neg)(up is neg)
+          while(tempX > 0 && tempY > 0 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX--;
+            tempY--;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x-1;
+          tempY = y+1;
+          //downleft (left is neg)(down is pos)
+          while(tempX > 0 && tempY < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX--;
+            tempY++;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+          toAddToFlip = new Array();
+          tempX = x+1;
+          tempY = y+1;
+          //downright (right is positive)(down is pos)
+          while(tempX < numberOfTiles-1 && tempY < numberOfTiles-1 && tileMatrix[tempX][tempY] == enemyColor){
+            toAddToFlip.push([tempX,tempY]);
+            tempX++;
+            tempY++;
+            if(tileMatrix[tempX][tempY] == 'e'){ // if next tile is empty
+              break;
+            }else if (tileMatrix[tempX][tempY] == playerToMove) { // if reaching another of your pieces
+              piecesToFlip = piecesToFlip.concat(toAddToFlip);
+              break;
+            }
+          }
+
+        }else{
+          return -1;
+        }
+        }catch(err){
+          console.log(err);
+          piecesToFlip = new Array();
+          tileMatrix[x][y] = 'e'; // revert change
+          return -3; // return errored
+        }
+        inAnimation = true; // mark inAnimation as true
+        possibleMoves = new Array(); // clear  possibleMoves
+        changeTurn();
+        return 1; // if success
+      }
+
+      function onClick(e){
+        if(loading){
+          return; // do not do anything while waiting for server
+        }
+        var rect = gameBoardCanvas.getBoundingClientRect();
+        let GlobalX = e.clientX;
+        let GlobalY = e.clientY;
+        let x = GlobalX - rect.left;
+        let y = GlobalY - rect.top;
+
+        if(x < borderSize || y < borderSize || x > width-borderSize || y >width-borderSize){
+            //console.log("Not in tile"); // Do nothing as it is on the border
+        }else{
+          //console.log(x + " , " + y); // is within the tiles
+          let tileX = Math.ceil((x-borderSize)/tileSize);
+          let tileY = Math.ceil((y-borderSize)/tileSize);
+          //console.log(tileX + " , " + tileY);
+          placePiece(tileX-1,tileY-1);
+        }
+      }
+
+      function onHover(e){
+        var rect = gameBoardCanvas.getBoundingClientRect();
+        let GlobalX = e.clientX;
+        let GlobalY = e.clientY;
+        let x = GlobalX - rect.left;
+        let y = GlobalY - rect.top;
+
+        if(x < borderSize || y < borderSize || x > width-borderSize || y >width-borderSize){
+            //console.log("Not in tile"); // Do nothing as it is on the border
+            mouseOverPiece = null; // if mouse is not over a possible move, do not highlight
+        }else{
+          //console.log(x + " , " + y); // is within the tiles
+          let tileX = Math.ceil((x-borderSize)/tileSize);
+          let tileY = Math.ceil((y-borderSize)/tileSize);
+          //console.log(tileX + " , " + tileY);
+          for(var i=0; i < possibleMoves.length; i++){
+            if(possibleMoves[i][0] === tileX-1 && possibleMoves[i][1] === tileY-1){
+              mouseOverPiece = [tileX-1,tileY-1];
+              break;
+            }else{
+              mouseOverPiece = null; // if mouse is not over a possible move, do not highlight
+            }
+          }
+        }
+      }
+
+      function msToTime(s) {
+        var ms = s % 1000;
+        s = (s - ms) / 1000;
+        var secs = s % 60;
+        s = (s - secs) / 60;
+        var mins = s % 60;
+        var hrs = (s - mins) / 60;
+
+        return (hrs > 0 ? (hrs + ':'): '')+ (mins < 10 ? '0' + mins : mins) + ':' + (secs < 10 ? '0' + secs : secs);
+      }
+
+      function animateDraw(){
+        var currTime = new Date();
+
+        if(piecesToFlip.length > 0){
+          inAnimation = true;
+          if(currTime - timeOfLastUpdate > 100){
+            let piece = piecesToFlip.pop();
+            let x = piece[0];
+            let y = piece[1];
+
+            if(tileMatrix[x][y] != 'e'){
+              tileMatrix[x][y] == 'b' ? tileMatrix[x][y] = 'w' : tileMatrix[x][y] = 'b'; // if black and not empty make white, else make black
+            }else{
+              console.log("error, tile is empty and thus can not flip");
+            }
+            timeOfLastUpdate = new Date;
+          }
+        }else{
+          if(inAnimation){ // if end of animation
+            inAnimation = false;
+            updateScore();
+            if(!offline){ // when online game update score on server
+              updateMoveWithServer();
+            }
+            findPossibleMoves(playerToMove);
+            if(playerToMove == 'w' && ai == true){//if ai turn
+              AITakeTurn();
+            }
+          }
+        }
+
+        var timer = document.getElementById('timer');
+        if(!gameEnded){
+        var outputTime = currTime - timeOfBeginning;
+        timer.innerHTML = msToTime(outputTime);
+        }else{
+          var outputTime = timeOfGameEnd - timeOfBeginning;
+          timer.innerHTML = msToTime(outputTime);
+        }
+
+        drawBackground();
+        drawPieces();
+      }
+
+      function updateScore(){
+        var blackNum = 0;
+        var whiteNum = 0;
+
+        for(let x=0; x < numberOfTiles; x++){
+          for(let y=0; y < numberOfTiles; y++){
+            if(tileMatrix[x][y] == 'b'){
+              blackNum++;
+            }else if(tileMatrix[x][y] == 'w'){
+              whiteNum++;
+            }
+          }
+        }
+
+        document.getElementById("blackScore").innerHTML = blackNum.toString();
+        document.getElementById("whiteScore").innerHTML = whiteNum.toString();
+      }
+
+      function onBackgroundColorChange(){
+        var colorPicker = document.getElementById("backgroundColorInput");
+        const s = new Option().style;
+        s.color = colorPicker.value;
+        if(s.color !== ''&& colorPicker.value[0] == '#' && colorPicker.value.length == 7){
+          gameColor = colorPicker.value;
+        }
+      }
+
+      function defaultBackgroundColor(){
+        gameColor = "#55A56E";
+        document.getElementById("backgroundColorInput").value = "#55A56E";
+      }
+
+      function onWhiteColorChange(){
+        var colorPicker = document.getElementById("whiteColorInput");
+        const s = new Option().style;
+        s.color = colorPicker.value;
+        if(s.color !== ''&& colorPicker.value[0] == '#' && colorPicker.value.length == 7){
+          whiteColor = colorPicker.value;
+          var elements = document.getElementsByClassName("whiteColor")
+          for (var i = 0; i < elements.length; i++){
+              elements[i].style.color = whiteColor;
+          }
+        }
+      }
+
+      function defaultWhiteColor(){
+        whiteColor = "#F0F0F0";
+
+        var elements = document.getElementsByClassName("whiteColor")
+        for (var i = 0; i < elements.length; i++){
+            elements[i].style.color = whiteColor;
+        }
+
+        document.getElementById("whiteColorInput").value = "#F0F0F0";
+      }
+
+      function onBlackColorChange(){
+        var colorPicker = document.getElementById("blackColorInput");
+        const s = new Option().style;
+        s.color = colorPicker.value;
+        if(s.color !== '' && colorPicker.value[0] == '#' && colorPicker.value.length == 7){
+          blackColor = colorPicker.value;
+          var elements = document.getElementsByClassName("blackColor")
+          for (var i = 0; i < elements.length; i++){
+              elements[i].style.color = blackColor;
+          }
+        }
+      }
+
+      function defaultBlackColor(){
+        blackColor = "#303030";
+
+        var elements = document.getElementsByClassName("blackColor")
+        for (var i = 0; i < elements.length; i++){
+            elements[i].style.color = blackColor;
+        }
+
+        document.getElementById("blackColorInput").value = "#303030";
+      }
+
+      function endGame(){
+        timeOfGameEnd = new Date();
+        gameEnded = true;
+
+        var blackNum = 0;
+        var whiteNum = 0;
+
+        for(let x=0; x < numberOfTiles; x++){
+          for(let y=0; y < numberOfTiles; y++){
+            if(tileMatrix[x][y] == 'b'){
+              blackNum++;
+            }else if(tileMatrix[x][y] == 'w'){
+              whiteNum++;
+            }
+          }
+        }
+
+        var winner = "";
+        if(whiteNum > blackNum){
+          document.getElementById("turnCounter").innerHTML = "<span class='whiteColor' style='color:" + whiteColor + ";'>The Winner is White!</span>";
+        }else if(whiteNum < blackNum){
+          document.getElementById("turnCounter").innerHTML = "<span class='blackColor' style='color:" + blackColor + ";'>The Winner is Black!</span>";
+        }else{
+          document.getElementById("turnCounter").innerHTML = "The Game is a Tie!";
+        }
+        if(!offline){
+          updateMoveWithServer();
+        }
+      }
+
+      function toggleAI(){
+        var  checkbox = document.getElementsByName("AI")[0];
+        ai = checkbox.checked;
+        if(playerToMove == 'w' && ai == true){//if ai turn
+          AITakeTurn();
+        }
+      }
+
+      function AITakeTurn(){
+        var weightedMoves = [...possibleMoves];
+        for(var i=0; i < possibleMoves.length; i++){
+          var weight = 1;
+          var move = possibleMoves[i];
+          if(move[0] == 0 || move[0] == numberOfTiles-1){
+            weight++;
+          }
+          if(move[1] == 0 || move[1] == numberOfTiles-1){
+            weight++;
+          }
+          if(
+            (move[0] == 1 || move[0] == numberOfTiles-2) && (move[1] == 0 || move[1] == numberOfTiles-1 || move[1] == 1 || move[1] == numberOfTiles-2) ||
+            (move[1] == 1 || move[1] == numberOfTiles-2) && (move[0] == 0 || move[0] == numberOfTiles-1 || move[0] == 1 || move[0] == numberOfTiles-2)
+          ){
+            weight = 0;
+          }
+          
+          for(var j=0; j <= weight; j++){
+            weightedMoves.push(move);
+          }
+        }
+        
+        var move = weightedMoves[Math.floor(Math.random()*weightedMoves.length)];
+        console.log(weightedMoves);
+        placePiece(move[0],move[1]);
+      }
+
+      function toggleSettings(){
+        var height = document.getElementById('settings').style.height;
+        if(height != "400px"){
+          document.getElementById('settings').style.height = '400px';
+        }else{
+          document.getElementById('settings').style.height = '0px';
+        }
+      }
+
+      function navBarLogin(){
+        document.getElementById("loginElement").innerHTML = "<a href='accountpage.html'>" + login  +" <img style='vertical-align:middle;margin-left:10px;' height='30px' width='30px' src='" + avatarPath + "' alt='userAvatar'>" + "</a>";
+      }
+
+      function checkLogin(){
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        loading = true;
+        httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','checkLogin.php',false); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        httpRequest.send();
+      }
+
+      function loginReturn(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+            if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                 if(httpRequest.responseText != "NULL"){
+                   var jsonReturn = JSON.parse(httpRequest.responseText);
+                   if(jsonReturn["error"] !== undefined){
+                     console.error("Error with Username:" + jsonReturn["error"]);
+                   }
+                   login = jsonReturn["username"];
+                   avatarPath = jsonReturn["avatar"];
+                   navBarLogin();
+              }
+              loading = false;
+            }
+      	  } else {
+              alert('There was a problem when requesting login.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception: ' + e.description);
+        }
+      }
+    </script>
+  </head>
+
+
+
+
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+
+        <li role="button" class = "navigationElem" id = "Menu" style = "float:right;"> <img src="hMenu.png" alt="Menu Icon" hight="50px" width="50px" onclick="toggleSettings()"> <li>
+        <li class = "navigationElem" id = "loginElement" style = "float:right;"><a href="loginpage.html">Login</a><li>
+      </ul>
+    </header>
+
+    <section id = "settings">
+      <label for="backgroundColor">GameBoard Background Color: </label> <br>
+      <input id = "backgroundColorInput" type="text" name="backgroundColor" value="" onchange="onBackgroundColorChange();"
+onkeyup="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();">
+      <button type="button" name="button" onclick="defaultBackgroundColor()">Default</button>
+      <br>
+
+      <label for="whitePieceColor">white Piece Color: </label> <br>
+      <input id = "whiteColorInput" type="text" name="whiteColor" value="" onchange="onWhiteColorChange();"
+onkeyup="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();">
+      <button type="button" name="button" onclick="defaultWhiteColor()">Default</button>
+      <br>
+
+      <label for="blackPieceColor">black Piece Color: </label> <br>
+      <input id = "blackColorInput" type="text" name="blackColor" value="" onchange="onBlackColorChange();"
+onkeyup="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();">
+      <button type="button" name="button" onclick="defaultBlackColor()">Default</button>
+      <br>
+
+      <div id="AIToggle">
+        <label for="AI" style="margin: 10px;">White AI: </label>
+        <input type="checkbox" name="AI" value="" onclick="toggleAI()">
+      </div>
+    </section>
+
+    <h2 id="gameNameTitle" class="centered" >Loading...</h2>
+    <!-- game info -->
+    <div class="centered" id="gameInfo">
+      <p id ="turnCounter">Turn: <span class="blackColor">Black</span> </p>
+      <h3 id="timer" role="timer">00:00</h3>
+      <p><span class="blackColor">Black Score: <span id="blackScore">LOADING</span></span> <span class="whiteColor">White Score: <span id="whiteScore">LOADING</span></span></p>
+    </div>
+
+    <canvas role="application" id="gameBoardCanvas" width="500" height="500"></canvas>
+    <script type="text/javascript"> canvasLoad() </script>
+    <p id="errorMessageText" role="alert" style="color:red;"></p>
+    <div role="separator" style="margin-bottom: 40px;"></div>
+
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>

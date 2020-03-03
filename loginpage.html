@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      footer p{
+         margin:2px;
+      }
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+
+      }
+      .navigationElem p{
+        text-align: center;
+        text-decoration: none;
+      }
+
+
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+
+
+      footer{
+        background-color:#3171C6;
+        color:white;
+
+        position: fixed;
+
+        bottom: 0;
+        width: 100%
+
+      }
+
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+
+      .login, .signUp{
+        width:400px;
+        background-color: #e4f2f2;
+        color:black;
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .container{
+        margin-top: 5vh;
+      }
+    </style>
+
+    <script src="jquery-3.4.1.min.js"></script>
+
+    <script type="text/javascript">
+    var login = undefined;
+    var httpRequest = new XMLHttpRequest();
+
+    function checkLogin(){
+      if (!httpRequest) { // check if the object was properly created
+      // issues with the browser, example: old browser
+        alert('Cannot create an XMLHTTP instance');
+        return false;
+      }
+      httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+      httpRequest.open('POST','checkLogin.php'); // open needed PHP file
+      httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      httpRequest.send();
+    }
+
+    function loginReturn(){
+      try {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+          if(httpRequest.responseText != ''){
+               //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+               if(httpRequest.responseText != "NULL"){
+                 login = httpRequest.responseText;
+                 window.location.href = "accountpage.html";
+               }
+            }
+        } else {
+            alert('There was a problem when requesting login. \n ' + httpRequest.status);
+          }
+        }
+      }
+      catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+        alert('Caught Exception: ' + e.description);
+      }
+    }
+    </script>
+  </head>
+
+
+
+
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+
+        <li class = "navigationElem" id = "loginElement" style = "float:right;"><li>
+      </ul>
+    </header>
+
+    <div class="container">
+
+      <div class="login">
+        <h2>Login</h2>
+        <form id="loginForm" action="login.php" method="post" target="_self">
+          <div class="userNameLabel">
+            <label for="username">Username:</label>
+          </div>
+          <input type="input" name="username" value="" required>
+
+          <div class = "passwordLabel">
+          <label for="password">Password:</label>
+          </div>
+          <input type="password" name="password" value=""required>
+          <br>
+          <section style = "color:blue;text-decoration: underline;cursor: pointer;" onclick="alert('Well that sucks.')">Forgot Password?</section>
+          <br>
+          <div class="subbmitDiv">
+          <button type="submit" from="loginForm" name="submitLogin">Login</button>
+          </div>
+          <span id="login-server-results" role="alert"></span>
+        </form>
+      </div>
+
+      <div class="signUp">
+        <h2>Sign Up</h2>
+        <form id="signUpForm" action="signup.php" method="post" target="_self">
+          <div class="userNameLabel">
+            <label for="username">Username:</label>
+          </div>
+          <input type="input" name="username" value="" required>
+
+          <div class = "passwordLabel">
+          <label for="passwordOne">Password:</label>
+          </div>
+          <input type="password" name="passwordOne" value=""required>
+
+          <div class = "passwordLabel">
+          <label for="passwordTwo">Reenter Password:</label>
+          </div>
+          <input type="password" name="passwordTwo" value=""required>
+          <br>
+
+          <div class = "firstNameLabel">
+          <label for="firstName">First Name:</label>
+          </div>
+          <input type="input" name="firstName" value=""required>
+          <br>
+
+          <div class = "lastNameLabel">
+          <label for="lastName">Last Name:</label>
+          </div>
+          <input type="input" name="lastName" value=""required>
+          <br>
+
+          <div class = "ageLabel">
+          <label for="age">Age:</label>
+          </div>
+          <input type="number" name="age" value=""required>
+          <br>
+
+          <div class = "genderLabel">
+          <label for="gender">Gender:</label>
+          </div>
+          <input type="radio" name="gender" value="male"> Male
+          <input type="radio" name="gender" value="female"> Female
+          <input type="radio" name="gender" value="other" checked> Other
+          <br>
+          <br>
+
+          <div class="subbmitDiv">
+          <input type="submit">
+          </div>
+
+          <span id="signup-server-results" role="alert"></span>
+        </form>
+      </div>
+
+
+    </div>
+
+    <script type="text/javascript">
+      checkLogin(); // check if logged in
+
+      $("#signUpForm").submit(function(event){
+        event.preventDefault(); //prevent default action
+        var post_url = $(this).attr("action"); //get form action url
+        var request_method = $(this).attr("method"); //get form GET/POST method
+        var form_data = $(this).serialize(); //Encode form elements for submission
+
+        $.ajax({
+          url : post_url,
+          type: request_method,
+          data : form_data
+        }).done(function(response){ //
+          $("#signup-server-results").html(response);
+          if(response == "success"){
+            window.location.href = "homepage.html";
+          }
+        });
+        });
+
+        $("#loginForm").submit(function(event){
+          event.preventDefault(); //prevent default action
+          var post_url = $(this).attr("action"); //get form action url
+          var request_method = $(this).attr("method"); //get form GET/POST method
+          var form_data = $(this).serialize(); //Encode form elements for submission
+
+          $.ajax({
+            url : post_url,
+            type: request_method,
+            data : form_data
+          }).done(function(response){ //
+            $("#login-server-results").html(response);
+            if(response == "success"){
+              window.location.href = "homepage.html";
+            }
+          });
+          });
+
+    </script>
+
+    <div style="margin-bottom: 40px;"></div>
+
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+    
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      
+      footer p{
+         margin:2px;
+      }
+      
+      #CV{
+        margin:5px;
+        background-color: #e4f2f2;
+        color: black;
+        padding: 5px;
+        width: 580px;
+      }
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+      
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+        
+      }
+      .navigationElem p{
+        text-align: center;
+        text-decoration: none;
+      }
+      
+      
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+      
+      
+      footer{
+        background-color:#3171C6;
+        color:white;
+        
+        position: fixed;
+        
+        bottom: 0;
+        width: 100%
+        
+      }
+      
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+    </style>
+
+    <script type="text/javascript">
+    var login = undefined;
+    var avatarPath = "avatars\\default.png"
+    var httpRequest = new XMLHttpRequest();
+    
+    function navBarLogin(){
+      document.getElementById("loginElement").innerHTML = "<a href='accountpage.html'>" + login  +" <img style='vertical-align:middle;margin-left:10px;' height='30px' width='30px' src='" + avatarPath + "' alt='userAvatar'>" + "</a>";
+    }
+    
+    function checkLogin(){
+      if (!httpRequest) { // check if the object was properly created
+      // issues with the browser, example: old browser
+        alert('Cannot create an XMLHTTP instance');
+        return false;
+      }
+      httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+      httpRequest.open('POST','checkLogin.php'); // open needed PHP file
+      httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      httpRequest.send();
+    }
+    
+    function loginReturn(){
+      try {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+          if(httpRequest.responseText != ''){
+               //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+               if(httpRequest.responseText != "NULL"){
+                 var jsonReturn = JSON.parse(httpRequest.responseText);
+                 if(jsonReturn["error"] !== undefined){
+                   console.error("Error with Username:" + jsonReturn["error"]);
+                 }
+                 login = jsonReturn["username"];
+                 avatarPath = jsonReturn["avatar"];
+                 navBarLogin();
+               }
+            }
+        } else {
+            alert('There was a problem when requesting login.');
+          }
+        }
+      }
+      catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+        alert('Caught Exception: ' + e.description);
+      }
+    }
+    </script>
+      
+  </head>
+  
+  
+  
+  
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+        
+        <li class = "navigationElem" id = "loginElement" style = "float:right;"><a href="loginpage.html">Login</a><li>
+      </ul>
+    </header>
+    
+    <h2>Website Created By</h2>
+    <article id="CV">
+      <h3><strong>Nicholas Cochrane</strong></h3>
+      
+      <p>(559)XXX-XXXX <br>
+        nicholascochrane25@gmail<br>
+        
+        <strong>Computer Programmer</strong><br>
+        BS Computer Science California State University Fresno<br>
+        <br>
+        Languages: <br>
+        C++, C#, Haskell, Open GL, HTML, Javascript, PHP, Python, Ajax, SQL, MySQL
+      </p>
+      
+    </article>
+    
+    <script type="text/javascript">
+      checkLogin();
+    </script>
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>

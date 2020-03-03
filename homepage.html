@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      footer p{
+         margin:2px;
+      }
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+
+      }
+      .navigationElem p{
+        text-align: center;
+        text-decoration: none;
+      }
+
+
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+
+
+      #offlineGame h2, #onlineGame h2{
+        background-color:#3171C6;
+        margin-bottom: 0px;
+      }
+
+      #offlineGame, #onlineGame{
+        margin-bottom: 70px;
+        max-width: 550px;
+        padding-left: calc(50vw - 275px);
+        padding-right: calc(50vw - 275px);
+      }
+
+      .gameSettupContainer{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      #topPlayers{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 600px;
+        background-color: #e4f2f2;
+        color:black;
+        padding-bottom: 10px;
+      }
+
+      #onlineErrorText, .notLoggedInMessage, .notLoggedInMessage *{
+        margin: 0px;
+        padding: 0px;
+        background-color: #e4f2f2;
+        color:darkred;
+      }
+
+      .gameSettup{
+        background-color: #e4f2f2;
+        color:black;
+        overflow: hidden;
+        transition: all .5s ease-in-out;
+        height: 0px;
+        padding: 0px;
+      }
+
+
+      footer{
+        background-color:#3171C6;
+        color:white;
+
+        position: fixed;
+
+        bottom: 0;
+        width: 100%
+
+      }
+
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+      
+      #topScoreTable{
+        width: 100%
+      }
+    </style>
+
+    <script type="text/javascript">
+      var login = undefined;
+      var avatarPath = "avatars\\default.png";
+      var httpRequest = new XMLHttpRequest();
+
+      function toggleSettings(id){
+        if(id == "onlineSettup" && login == undefined){
+          document.getElementById(id).style.height = '0px';
+          document.getElementById(id).style.padding = '0px';
+          return
+        }
+
+        var height = document.getElementById(id).style.height;
+        if(height != "150px"){
+          document.getElementById(id).style.height = '150px';
+          document.getElementById(id).style.padding = '10px';
+        }else{
+          document.getElementById(id).style.height = '0px';
+          document.getElementById(id).style.padding = '0px';
+        }
+      }
+
+      function newOfflineGame(){
+        window.location.href = ("game.html" + "?" + "boardSize=" + document.getElementById("offlineBoardSizeSelection").value + "&" + "ai=" + document.getElementsByName("offlineAI")[0].checked);
+      }
+
+      function newOnlineGame(){
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        httpRequest.onreadystatechange = newOnlineGameReturn; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','createOnlineGame.php'); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        var aiValue = false;
+        if(document.getElementsByName("onlineAI")[0].checked == true){
+          aiValue = true;
+        }
+        httpRequest.send("array=" + "{\"boardSize\": " + document.getElementById("onlineBoardSizeSelection").value +", \"ai\": \"" + aiValue +"\"}");
+      }
+      
+      function newOnlineGameReturn(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+              if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                 var jsonReturn = JSON.parse(httpRequest.responseText);
+                 
+                 if(jsonReturn["error"] !== undefined){
+                   console.log(jsonReturn["error"]);
+                   document.getElementById("onlineErrorText").innerHTML = jsonReturn["error"];
+                 }else if(jsonReturn["id"] !== undefined){
+                   window.location.href = ("game.html" + "?" + "id=" + jsonReturn["id"]);
+                 }else{
+                  document.getElementById("onlineErrorText").innerHTML = "Error: No response from server";
+                }
+            }else{
+              document.getElementById("onlineErrorText").innerHTML = "Error: No response from server";
+            }
+      	  } else {
+              alert('There was a problem with the request.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception: ' + e.description);
+        }
+      }
+
+      function navBarLogin(){
+        document.getElementById("loginElement").innerHTML = "<a href='accountpage.html'>" + login  +" <img style='vertical-align:middle;margin-left:10px;' height='30px' width='30px' src='" + avatarPath + "' alt='userAvatar'>" + "</a>";
+      }
+
+      function checkLogin(){
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','checkLogin.php'); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        httpRequest.send();
+      }
+
+      function loginReturn(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+            if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                 if(httpRequest.responseText != "NULL"){
+                   var jsonReturn = JSON.parse(httpRequest.responseText);
+                   if(jsonReturn["error"] !== undefined){
+                     console.error("Error with Username:" + jsonReturn["error"]);
+                   }
+                   login = jsonReturn["username"];
+                   avatarPath = jsonReturn["avatar"];
+                   document.getElementById("onlineSettupNotLoggedInMessage").style.height = '0px';
+                   document.getElementById("onlineSettupNotLoggedInMessage").style.visibility = 'hidden';
+                   navBarLogin();
+                 }
+                 updateScoreTable(); // toavoid conflicting calls to httprequest
+              }
+      	  } else {
+              alert('There was a problem when requesting login.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception: ' + e.description);
+        }
+      }
+      
+      function updateScoreTable(){
+        if (!httpRequest) { // check if the object was properly created
+        // issues with the browser, example: old browser
+          alert('Cannot create an XMLHTTP instance');
+          return false;
+        }
+        httpRequest.onreadystatechange = updateScoreTableReturn; // we assign a function to the property onreadystatechange (callback function)
+        httpRequest.open('POST','getTopScores.php'); // open needed PHP file
+        httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        var obj = new Object();
+        obj.type = document.getElementById("playerSortSelection").value;
+        obj.order = document.getElementById("scoreDESC").checked;
+        httpRequest.send("array=" + JSON.stringify(obj));
+      }
+      
+      function updateScoreTableReturn(){
+        try {
+          if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+            if(httpRequest.responseText != ''){
+      			     //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+                 var jsonReturn = JSON.parse(httpRequest.responseText);
+                 var table = document.getElementById("topScoreTable");
+                 while(table.rows.length > 1){
+                   table.deleteRow(table.rows.length-1);
+                 }
+                 
+                 for (index = 0; index < jsonReturn.length; ++index){
+                   var row = table.insertRow(table.rows.length);
+                   row.insertCell(0).innerHTML = index+1 + ".";
+                   row.insertCell(1).innerHTML = jsonReturn[index]["login"];
+                   row.insertCell(2).innerHTML = jsonReturn[index]["score"];
+                   row.insertCell(3).innerHTML = jsonReturn[index]["duration"];
+                 }
+                 
+              }
+      	  } else {
+              alert('There was a problem when requesting login.');
+            }
+          }
+        }
+        catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+          alert('Caught Exception: ' + e.description);
+        }
+      }
+    </script>
+
+  </head>
+
+
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+
+        <li class = "navigationElem" id = "loginElement" style = "float:right;"><a href="loginpage.html">Login</a><li>
+      </ul>
+    </header>
+
+    <div class="gameSettupContainer">
+
+      <div id="offlineGame">
+        <h2 role="button" onclick="toggleSettings('offlineSettup')">Start A New Offline Game</h2>
+        <div class="gameSettup" id = "offlineSettup">
+          <p>Offline games will not be saved in anyway and will be lost if the tab is closed.</p>
+          <label for="">Board Size:</label>
+          <select id = "offlineBoardSizeSelection">
+            <option value="4">4x4</option>
+            <option value="6">6x6</option>
+            <option value="8">8x8</option>
+          </select>
+          <br>
+          <label for="AI">Start with White AI Enabled: </label>
+          <input type="checkbox" name="offlineAI" value="false">
+          <br>
+          <button type="button" name="startOfflineGame" onclick="newOfflineGame()">New Game</button>
+        </div>
+      </div>
+
+      <div id="onlineGame">
+        <h2 role="button" onclick="toggleSettings('onlineSettup')">Start A New Saved Game</h2>
+        <div class="notLoggedInMessage" id="onlineSettupNotLoggedInMessage" role="alert">
+          <p><strong>You must be logged in to start a online game!</strong></p>
+        </div>
+        <div class="gameSettup" id = "onlineSettup">
+          <p>Online games will be saved if you are logged in and can be found on your account page. </p>
+          <label for="">Board Size:</label>
+          <select id = "onlineBoardSizeSelection">
+            <option value="4">4x4</option>
+            <option value="6">6x6</option>
+            <option value="8">8x8</option>
+          </select>
+          <br>
+          <label for="AI">Start with White AI Enabled: </label>
+          <input type="checkbox" name="onlineAI" value="false">
+          <br>
+          <button type="button" name="startOnlineGame" onclick="newOnlineGame()">New Game</button>
+          <p id="onlineErrorText"> </p>
+        </div>
+      </div>
+
+    </div>
+
+      <!--- TODO SCORE TABLE !--->
+      <div id="topPlayers">
+        <h3>Top Players (vs AI)</h3>
+          <select onchange="updateScoreTable()" id="playerSortSelection">
+            <option value="all">All Boards Score</option>
+            <option value="4">4x4 Score</option>
+            <option value="6">6x6 Score</option>
+            <option value="8">8x8 Score</option>
+            <option value="time">Best Time</option>
+          </select>
+           Descending Scores:
+          <input type="checkbox" name="DESC" value="DESC" id="scoreDESC" onchange="updateScoreTable()">
+        <table id="topScoreTable">
+          <tr>
+            <td></td>
+            <th>User</th>
+            <th>Score (Black)</th>
+            <th>Time</th>
+          </tr>
+          
+          <tr>
+            <td colspan="4">LOADING SCORES</td>
+          </tr>
+        </table>
+      </div>
+
+    </section>
+
+    <script type="text/javascript">
+      checkLogin();
+    </script>
+
+    <div style="margin-bottom: 40px;"></div>
+
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+    
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .blackColor{
+        color: black;
+        font-weight: bold;
+        text-shadow: none;
+      }
+
+      .whiteColor{
+        color: white;
+        font-weight: bold;
+        text-shadow:
+      		-1px -1px 0 #000,
+      		1px -1px 0 #000,
+      		-1px 1px 0 #000,
+      		1px 1px 0 #000;
+      }
+      
+      footer p{
+         margin:2px;
+      }
+      
+      #CV{
+        margin:5px;
+        background-color: #e4f2f2;
+        color: black;
+        padding: 5px;
+        width: 580px;
+      }
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+      
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+        
+      }
+      .navigationElem p{
+        text-align: center;
+        text-decoration: none;
+      }
+      
+      
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+      
+      
+      footer{
+        background-color:#3171C6;
+        color:white;
+        
+        position: fixed;
+        
+        bottom: 0;
+        width: 100%
+        
+      }
+      
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+      
+      #accountInfo{
+        margin-top: 20px;
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+        background-color: #e4f2f2;
+        color: black;
+        width: 600px;
+      }
+      
+      .gameObj{
+        margin-top: 20px;
+        padding: 10px;
+        display: block;
+        text-align: left;
+        margin-left: auto;
+        margin-right: auto;
+        background-color: #e4f2f2;
+        color: black;
+        width: 600px;
+      }
+      
+      .errormessage{
+        margin-top: 20px;
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+        color: red;
+      }
+    </style>
+
+    <script type="text/javascript">
+    var login = undefined;
+    var avatarPath = "avatars\\default.png";
+    var httpRequest = new XMLHttpRequest();
+    
+    function navBarLogin(){
+      document.getElementById("loginElement").innerHTML = "<a href='accountpage.html'>" + login + "</a>";
+    }
+    
+    function logout(){
+      if (!httpRequest) { // check if the object was properly created
+      // issues with the browser, example: old browser
+        alert('Cannot create an XMLHTTP instance');
+        return false;
+      }
+      httpRequest.onreadystatechange = logoutReturn; // we assign a function to the property onreadystatechange (callback function)
+      httpRequest.open('POST','logout.php'); // open needed PHP file
+      httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      httpRequest.send();
+    }
+    
+    function checkLogin(){
+      if (!httpRequest) { // check if the object was properly created
+      // issues with the browser, example: old browser
+        alert('Cannot create an XMLHTTP instance');
+        return false;
+      }
+      httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+      httpRequest.open('POST','getCurrentAccountInfo.php'); // open needed PHP file
+      httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      httpRequest.send();
+    }
+    
+    function logoutReturn(){
+      try {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+          if(httpRequest.responseText != ''){
+               //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+               window.location.href = "loginpage.html";
+            }
+        } else {
+            alert('There was a problem when requesting login.');
+          }
+        }
+      }
+      catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+        alert('Caught Exception: ' + e.description);
+      }
+    }
+    
+    function loginReturn(){
+      try {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+          if(httpRequest.responseText != ''){
+               //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+               jsonReturn = JSON.parse(httpRequest.responseText);
+               if(jsonReturn["error"] !== undefined){
+                 if(jsonReturn["error"] == "Not Logged In"){
+                   window.location.href = "loginpage.html";
+                 }
+                 document.getElementById("accountInfo").innerHTML = "<h1 class='errormessage' role='alert'>" + jsonReturn["error"] + "</h1>";
+               }else{ // if processed correctly
+                 document.getElementById("username").innerHTML = jsonReturn["username"];
+                 document.getElementById("firstName").innerHTML = jsonReturn["firstName"];
+                 document.getElementById("lastName").innerHTML = jsonReturn["lastName"];
+                 document.getElementById("age").innerHTML = jsonReturn["age"];
+                 document.getElementById("gender").innerHTML = jsonReturn["gender"];
+                 avatarPath = jsonReturn["avatar"];
+                 document.getElementById("avatarImage").src = avatarPath;
+                 
+                 //show games
+                 var html;
+                 var aiSymbol = "?";
+                 var gameStatus = "ERROR";
+                 for (index = 0; index < jsonReturn["games"].length; ++index) {
+                    if(jsonReturn["games"][index]["ai"] == 1){
+                      aiSymbol= "✔️";
+                    }else{
+                      aiSymbol ="❌";
+                    }
+                   if(jsonReturn["games"][index]["complete"] == 0){
+                     gameStatus = "Ongoing";
+                   }else{
+                     if(jsonReturn["games"][index]["winner"] == 'w'){
+                       gameStatus = "<span class='whiteColor'>White Won</span>";
+                     }else if(jsonReturn["games"][index]["winner"] == 'b'){
+                       gameStatus = "<span class='blackColor'>Black Won</span>";
+                     }else if(jsonReturn["games"][index]["winner"] == 't'){
+                       gameStatus = "Game ended in a tie";
+                     }else{
+                       gameStatus = "ERROR UNKOWN";
+                     }
+                   }
+                      html = "<a href='game.html?id="+ jsonReturn["games"][index]["id"]+"'><h4>ID: "+ jsonReturn["games"][index]["id"]+"</h4></a>\n<h4>Status: "+ gameStatus +"</h4>\n<p>Duration: "+ jsonReturn["games"][index]["duration"]+"</p>\n<p><span  style = 'white-space: pre;' class='whiteColor'>White Score: "+ jsonReturn["games"][index]["whiteScore"]+"<span>      <span class='blackColor'>Black Score: "+ jsonReturn["games"][index]["blackScore"]+"<span></p>\n<p>AI Game: "+ aiSymbol +"</p>"
+                      var newGame = document.createElement("div");
+                      newGame.className = "gameObj";
+                      newGame.innerHTML = html;
+                      document.getElementById("gameList").appendChild(newGame);
+                  }
+               }
+            }
+        } else {
+            alert('There was a problem when requesting login.');
+          }
+        }
+      }
+      catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+        alert('Caught Exception: ' + e.description);
+      }
+    }
+    </script>
+  </head>
+  
+  
+  
+  
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+        
+        <li class = "navigationElem" id = "loginElement" style = "float:right;" ><a href="#" onclick="logout()">Logout</a><li>
+      </ul>
+    </header>
+    
+    <article id="accountInfo">
+      <h2 style="padding:10px" id="username"> Loading </h2>
+      <img height="300px" width="300px" src="avatars\default.png" alt="avatar" id="avatarImage">
+      <br>
+      <label for="avatarUploadForm"> Upload a new avatar:</label>
+      <form id="avatarUploadForm" action="uploadAvatar.php" method="post" enctype="multipart/form-data">
+        <input type="file" name="avatarUpload" accept="image/*">
+        <input type="submit">
+      </form>
+      <br>
+      <p><strong>First Name: </strong><span id = "firstName">loading</span></p>
+      <p><strong>Last Name: </strong><span id = "lastName">loading</span></p>
+      <p><strong>Age: </strong><span id = "age">loading</span></p>
+      <p><strong>Gender: </strong><span id = "gender">loading</span></p>
+    </article>
+    
+    <div id='gameList'>
+    </div>
+    
+    <script type="text/javascript">
+      checkLogin();
+    </script>
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Play Reversi</title>
+
+    <style media="screen">
+      .centered{
+        display: block;
+        text-align:center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      article p{
+        margin-left: auto;
+        margin-right: auto;
+        width: 800px;
+      }
+
+      footer p{
+
+         margin:2px;
+      }
+
+      #navigationHeader {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color:#3171C6;
+        height:50px;
+      }
+
+      .navigationElem a{
+        float: left;
+        display: block;
+        padding: 11px 20px;
+        font-size: 15pt;
+        height:50px;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        background-color: #3171C6;
+
+      }
+      .navigationElem p{
+        text-align: center;
+        text-decoration: none;
+      }
+
+
+      .navigationElem a:hover{
+        background-color: #0141A6;
+      }
+
+
+      footer{
+        background-color:#3171C6;
+        color:white;
+
+        position: fixed;
+
+        bottom: 0;
+        width: 100%
+
+      }
+
+      body{
+        background-color:#0099DE;
+        color:white;
+        padding:0px;
+        margin:0px;
+      }
+    </style>
+
+    <script type="text/javascript">
+    var login = undefined;
+    avatarPath = "avatars\\default.png";
+    var httpRequest = new XMLHttpRequest();
+
+    function navBarLogin(){
+      document.getElementById("loginElement").innerHTML = "<a href='accountpage.html'>" + login  +" <img style='vertical-align:middle;margin-left:10px;' height='30px' width='30px' src='" + avatarPath + "' alt='userAvatar'>" + "</a>";
+    }
+
+    function checkLogin(){
+      if (!httpRequest) { // check if the object was properly created
+      // issues with the browser, example: old browser
+        alert('Cannot create an XMLHTTP instance');
+        return false;
+      }
+      httpRequest.onreadystatechange = loginReturn; // we assign a function to the property onreadystatechange (callback function)
+      httpRequest.open('POST','checkLogin.php'); // open needed PHP file
+      httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      httpRequest.send();
+    }
+
+    function loginReturn(){
+      try {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+          if(httpRequest.responseText != ''){
+               //alert(httpRequest.responseText); // Display the textual information from the httpRequest (just a basic alert function)
+               if(httpRequest.responseText != "NULL"){
+                 var jsonReturn = JSON.parse(httpRequest.responseText);
+                 if(jsonReturn["error"] !== undefined){
+                   console.error("Error with Username:" + jsonReturn["error"]);
+                 }
+                 login = jsonReturn["username"];
+                 avatarPath = jsonReturn["avatar"];
+                 navBarLogin();
+               }
+            }
+        } else {
+            alert('There was a problem when requesting login.');
+          }
+        }
+      }
+      catch( e ) { // Always deal with what can happen badly, client-server applications --> there is always something that can go wrong on one end of the connection
+        alert('Caught Exception: ' + e.description);
+      }
+    }
+    </script>
+
+  </head>
+
+
+
+
+  <body>
+    <header role="nav">
+      <ul id="navigationHeader">
+        <li class = "navigationElem"><a href="homepage.html">Home</a> <li>
+        <li class = "navigationElem"><a href="howtoplay.html">How to Play</a><li>
+        <li class = "navigationElem"><a href="about.html">About</a><li>
+
+        <li class = "navigationElem" id = "loginElement" style = "float:right;"><a href="loginpage.html">Login</a><li>
+      </ul>
+    </header>
+
+    <article class="centered">
+      <br>
+      <img src="example.jpg" alt="6x6 Board in Default Position (center 4 squares are alternating black and white peices)"> <br>
+      <p>To start a game go to the homepage and select an offline game or if you want to and are logged in an online game. Choose a 4x4, 6x6, or 8x8 sized game board (the one above is 6x6) and if you want the white team to be played by an AI. If you play an offline game you can turn the AI off at anytime in the setting menu in the upper right when playing the game. There you can also change the game board color. The game will always start as the black player, the transparent pieces are the ones that the current player can place. When a pice is placed it will convert all of the opponents peices that are inbetween it and another of the players peices.</p>
+      <img src="example2.jpg" alt="6x6 Board in After trun (one black peice was placed and a white was conveted)"> <br>
+      <p>The goal of the game is to have the most pices when no more moves can be played <strong>by anyplayer</strong>.</p>
+      <br>
+    </article>
+
+    <script type="text/javascript">
+      checkLogin();
+    </script>
+
+    <div style="margin-bottom: 40px;"></div>
+
+    <footer role="contentinfo">
+      <p>Website created by Nicholas Cochrane</p>
+    </footer>
+  </body>
+</html>
